@@ -1,0 +1,872 @@
+<!-- Scripts -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+<!-- Scripts -->
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+
+
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class Noticia extends Model
+{
+    use HasFactory;
+    use SoftDeletes;
+}
+
+===
+
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\Gate;
+use App\Models\Noticia;
+use App\Models\User;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * The model to policy mappings for the application.
+     *
+     * @var array<class-string, class-string>
+     */
+    protected $policies = [
+        // 'App\Models\Model' => 'App\Policies\ModelPolicy',
+    ];
+
+    /**
+     * Register any authentication / authorization services.
+     *
+     * @return void 
+     */
+    public function boot()
+    {
+        $this->registerPolicies();
+
+        Gate::define('excluir-noticia', function (User $user, Noticia $noticia){
+            return $user->id === $noticia->user_id;
+        });
+    }
+}
+
+===
+
+[ ... ]
+    public function boot()
+    {
+        $this->registerPolicies();
+
+        Gate::define('excluir-noticia', function (User $user, Noticia $noticia){
+            return $user->id === $noticia->user_id;
+        });
+
+        Gate::define('visualizar-noticia', function (User $user, Noticia $noticia){
+            return $user->id === $noticia->user_id;
+        });
+
+        Gate::define('editar-noticia', function (User $user, Noticia $noticia){
+            return $user->id === $noticia->user_id;
+        });
+    }
+[ ... ]
+===
+
+app/Http/Controllers/NoticiaController.php
+
+[ ... ]
+public function destroy(Noticia $noticia)
+    {   
+        $this->authorize('excluir-noticia', $noticia);
+[ ... ]
+
+[ ... ]
+    public function edit(Noticia $noticia)
+    {
+        $this->authorize('editar-noticia', $noticia);
+
+        return view('viewsNoticias.edit', compact(['noticia']));
+    }
+
+
+[ ... ]
+    public function show(Noticia $noticia)
+    {
+        $this->authorize('visualizar-noticia', $noticia);
+
+        return view('viewsNoticias.show', compact(['noticia']));
+    }
+[ ... ]
+
+
+[ ... ]
+    /**
+     * Display the specified resource.
+     *
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Noticia $noticia)
+    {
+        //$this->authorize('visualizar-noticia', $noticia);
+
+        if(! Gate::allows('visualizar-noticia', $noticia)){
+            abort(403);
+        }
+
+        return view('viewsNoticias.show', compact(['noticia']));
+    }
+[ ... ]
+
+use Illuminate\Support\Facades\Gate;
+
+
+[ ... ]
+    public function show(Noticia $noticia)
+    {
+        //$this->authorize('visualizar-noticia', $noticia);
+
+        if(Gate::denies('visualizar-noticia', $noticia)){
+            abort(403);
+        }
+
+        return view('viewsNoticias.show', compact(['noticia']));
+    }
+[ ... ]
+
+
+@if(Auth::check())
+
+[ ... ]
+
+@endif
+
+resources/views/viewsNoticias/index.blade.php
+
+
+[ ... ]
+@can('visualizar-noticia', $noticia)
+	<div style="margin-right:2%;">
+		<button type="button" class="btn btn-outline-info">
+                	<a href="{{ route('noticias.show', $noticia) }}">Visualizar</a>
+        	</button>
+	</div>
+@endcan
+[ ... ]
+
+
+
+@auth
+@can('excluir-noticia', $noticia)
+    <div style="margin-right:2%;">
+        <form method="post" action=" {{ route('noticias.destroy', $noticia) }} "
+            onsubmit="return confirm('Tem certeza que deseja REMOVER {{ addslashes($noticia->titulo) }}?')">
+            @csrf
+            @method('DELETE')
+            <button class="btn btn-outline-danger">
+                Excluir
+            </button>
+        </form>
+    </div>
+@endcan
+
+@can('editar-noticia', $noticia)
+    <div style="margin-right:2%;">
+        <button type="button" class="btn btn-outline-success">
+            <a href="{{ route('noticias.edit', $noticia) }}">Editar</a>
+        </button>
+    </div>
+@endcan
+
+@can('visualizar-noticia', $noticia)
+    <div style="margin-right:2%;">
+        <button type="button" class="btn btn-outline-info">
+            <a href="{{ route('noticias.show', $noticia) }}">Visualizar</a>
+        </button>
+    </div>
+@endcan
+
+@endauth
+
+
+
+app/Providers/AuthServiceProvider.php
+
+[ ... ]
+	Gate::before(function($user){
+	    if($user->admin === 1){
+	        return true;
+	    }
+	});
+[ ... ]
+
+
+===
+app/Providers/AuthServiceProvider.php
+[ ... ]
+	Gate::define('criar-noticia', function(User $user){
+	    return ($user->admin <= 1);
+	});
+[ ... ]
+
+app/Http/Controllers/NoticiaController.php
+[ ... ]
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        $this->authorize('criar-noticia');
+
+        return view('viewsNoticias.create');
+    }
+[ ... ]
+
+resources/views/viewsNoticias/index.blade.php
+[ ... ]
+@if(Auth::check())
+     @can('criar-noticia')
+	<div style="margin-bottom:2%;">
+	    <button type="button" class="btn btn-outline-primary">
+		<a href="{{ route('noticias.create') }}">Criar Noticia</a>
+	    </button>
+	</div>
+    @endcan
+@endif
+[ ... ]
+
+===
+
+app/Policies
+
+
+
+app/Providers/AuthServiceProvider.php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\Gate;
+use App\Models\Noticia;
+use App\Models\User;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * The model to policy mappings for the application.
+     *
+     * @var array<class-string, class-string>
+     */
+    protected $policies = [
+        // 'App\Models\Model' => 'App\Policies\ModelPolicy',
+        Noticia::class => 'App\Policies\NoticiaPolicy',
+    ];
+
+===
+app/Policies/NoticiaPolicy.php
+<?php
+
+namespace App\Policies;
+
+use App\Models\Noticia;
+use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
+
+class NoticiaPolicy
+{
+    use HandlesAuthorization;
+
+    /**
+     * Determine whether the user can view any models.
+     *
+     * @param  \App\Models\User  $user
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function viewAny(User $user)
+    {
+        //
+    }
+
+    /**
+     * Determine whether the user can view the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function view(User $user, Noticia $noticia)
+    {
+        return $user->id === $noticia->user_id;
+    }
+
+    /**
+     * Determine whether the user can create models.
+     *
+     * @param  \App\Models\User  $user
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function create(User $user)
+    {
+        return $user->admin <= 1;
+    }
+
+    /**
+     * Determine whether the user can update the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function update(User $user, Noticia $noticia)
+    {
+        return $user->id === $noticia->user_id;
+    }
+
+    /**
+     * Determine whether the user can delete the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function delete(User $user, Noticia $noticia)
+    {
+        return $user->id === $noticia->user_id;
+    }
+
+    /**
+     * Determine whether the user can restore the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function restore(User $user, Noticia $noticia)
+    {
+        //
+    }
+
+    /**
+     * Determine whether the user can permanently delete the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function forceDelete(User $user, Noticia $noticia)
+    {
+        //
+    }
+}
+
+===
+app/Http/Controllers/NoticiaController.php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\StoreNoticiaRequest;
+use App\Http\Requests\UpdateNoticiaRequest;
+use App\Http\Controllers\Requests;
+use App\Models\Noticia;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+
+class NoticiaController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth');   
+    }
+    
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
+    {
+        //echo "[ Index de Noticias ]";
+
+        $noticias = Noticia::all();
+        return view('viewsNoticias.index', compact('noticias'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function create()
+    {
+        //$this->authorize('criar-noticia');
+        $this->authorize('create', Noticia::class);
+
+        return view('viewsNoticias.create');
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \App\Http\Requests\StoreNoticiaRequest  $request
+     * @return \Illuminate\Http\Response
+     */
+    /**Observe que aqui o Request foi personalizado devido a criacao do Model utilizando o --all
+     * Assim, ele verifica se o usuario tem autorizacao para realizar a requisicao no arquivo
+     * StoreNoticiaRequest. Isso tambem vale para o update
+     */
+    //public function store(Request $request)
+    public function store(StoreNoticiaRequest $request)
+    {
+        //echo "Metodo STORE";
+        $this->authorize('create', Noticia::class);
+        
+        $novanoticia = new Noticia();
+        $novanoticia->titulo = $request->titulo;
+        $novanoticia->descricao = $request->descricao;
+        $novanoticia->user_id = auth()->user()->id;
+
+        $novanoticia->save();
+
+        return redirect()->route('noticias.index');
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Noticia $noticia)
+    {
+        //$this->authorize('visualizar-noticia', $noticia);
+        $this->authorize('view', $noticia);
+
+        /*
+        if(Gate::denies('visualizar-noticia', $noticia)){
+            abort(403);
+        }
+        */
+
+        return view('viewsNoticias.show', compact(['noticia']));
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Http\Response
+     */
+    public function edit(Noticia $noticia)
+    {
+        //$this->authorize('editar-noticia', $noticia);
+        $this->authorize('update', $noticia);
+
+        return view('viewsNoticias.edit', compact(['noticia']));
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \App\Http\Requests\UpdateNoticiaRequest  $request
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Http\Response
+     */
+    public function update(UpdateNoticiaRequest $request, Noticia $noticia)
+    {
+        //echo "Metodo UPDATE";
+        $this->authorize('update', $noticia);
+
+        $noticia->titulo = $request->titulo;   
+        $noticia->descricao = $request->descricao;
+        $noticia->save();
+        
+        return redirect()->route('noticias.index');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Noticia $noticia)
+    {   
+        //$this->authorize('excluir-noticia', $noticia);
+        $this->authorize('delete', $noticia);
+
+        $noticia = Noticia::find($noticia->id);
+        
+        if(!isset($noticia)){
+            $msg = "Não há [ Noticia ], com identificador [ $noticia->id ], registrada no sistema!";
+            $link = "noticias.index";
+            return view('noticias.erroid', compact(['msg', 'link']));
+        }
+        
+        Noticia::destroy($noticia->id);
+        
+        return redirect()->route('noticias.index');
+        
+    }
+}
+
+===
+resources/views/viewsNoticias/index.blade.php
+@can('view', $noticia)
+	<div style="margin-right:2%;">
+		<button type="button" class="btn btn-outline-info">
+		    <a href="{{ route('noticias.show', $noticia) }}">Visualizar</a>
+		</button>
+	</div>
+@endcan
+===
+resources/views/viewsNoticias/index.blade.php
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Listagem de Noticias') }}
+        </h2>
+    </x-slot>
+
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+                    @if(Auth::check())
+                        <!-- can('criar-noticia') -->
+                        @can('create', App\Models\Noticia::class)
+                        <div style="margin-bottom:2%;">
+                            <button type="button" class="btn btn-outline-primary">
+                                <a href="{{ route('noticias.create') }}">Criar Noticia</a>
+                            </button>
+                        </div>
+                        @endcan
+                        <!-- endcan -->
+                    @endif
+                    <!--<ul class="list-group">-->
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                <th scope="col">#ID</th>
+                                <th scope="col">Titulo</th>
+                                <th scope="col">Descricao</th>
+                                <th scope="col">ID Usuario</th>
+                                <th scope="col">Acoes</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>    
+                                @foreach($noticias as $noticia)
+                                <tr>
+                                <!--<li class="list-group-item d-flex justify-content-between align-items-center">-->
+                                    <th scope="row"> {{ $noticia->id }} </th>
+                                    <td> {{ $noticia->titulo }} </td>
+                                    <td> {{ $noticia->descricao}} </td>
+                                    <td> {{ $noticia->user_id }} </td>
+                                    <td>
+
+                                    <div style="display:flex">    
+                                    @auth
+                                        <!-- can('excluir-noticia', $noticia) -->
+                                            @can('delete', $noticia)
+                                            <div style="margin-right:2%;">
+                                                <form method="post" action=" {{ route('noticias.destroy', $noticia) }} "
+                                                    onsubmit="return confirm('Tem certeza que deseja REMOVER {{ addslashes($noticia->titulo) }}?')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button class="btn btn-outline-danger">
+                                                        Excluir
+                                                    </button>
+                                                </form>
+                                            </div>
+                                            @endcan
+                                        <!-- endcan -->
+                                        
+                                        <!-- can('editar-noticia', $noticia) -->
+                                            @can('update', $noticia)
+                                            <div style="margin-right:2%;">
+                                                <button type="button" class="btn btn-outline-success">
+                                                    <a href="{{ route('noticias.edit', $noticia) }}">Editar</a>
+                                                </button>
+                                            </div>
+                                            @endcan
+                                        <!-- endcan -->
+                                        
+                                        <!-- can('visualizar-noticia', $noticia) -->
+                                            @can('view', $noticia)
+                                            <div style="margin-right:2%;">
+                                                <button type="button" class="btn btn-outline-info">
+                                                    <a href="{{ route('noticias.show', $noticia) }}">Visualizar</a>
+                                                </button>
+                                            </div>
+                                            @endcan
+                                        <!-- endcan -->
+
+                                    @endauth
+                                    </div>
+                                    </td>
+                                <!--</li>-->
+
+                                </tr>
+                                @endforeach
+                                
+                            </tbody>
+                        </table>
+
+        </div>            
+    </div>
+</x-app-layout>
+===
+
+app/Providers/AuthServiceProvider.php
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\Facades\Gate;
+use App\Models\Noticia;
+use App\Models\User;
+use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+
+class AuthServiceProvider extends ServiceProvider
+{
+    /**
+     * The model to policy mappings for the application.
+     *
+     * @var array<class-string, class-string>
+     */
+    protected $policies = [
+        // 'App\Models\Model' => 'App\Policies\ModelPolicy',
+        //Noticia::class => 'App\Policies\TestePolicy',
+        Noticia::class => 'App\Policies\NoticiaPolicy',
+    ];
+
+    /**
+     * Register any authentication / authorization services.
+     *
+     * @return void 
+     */
+    public function boot()
+    {
+        $this->registerPolicies();
+
+        
+        Gate::before(function($user){
+            if($user->admin === 1){
+                return true;
+            }
+        });
+
+    }
+}
+===
+
+app/Policies/NoticiaPolicy.php
+<?php
+
+namespace App\Policies;
+
+use App\Models\Noticia;
+use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
+
+class NoticiaPolicy
+{
+    use HandlesAuthorization;
+
+    /**
+     * Determine whether the user can view any models.
+     *
+     * @param  \App\Models\User  $user
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function viewAny(User $user)
+    {
+        //
+    }
+
+    /**
+     * Determine whether the user can view the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function view(User $user, Noticia $noticia)
+    {
+        return (($user->id === $noticia->user_id) || ($user->admin == 1));
+        
+    }
+
+    /**
+     * Determine whether the user can create models.
+     *
+     * @param  \App\Models\User  $user
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function create(User $user)
+    {
+        return $user->admin <= 1;
+    }
+
+    /**
+     * Determine whether the user can update the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function update(User $user, Noticia $noticia)
+    {
+        return (($user->id === $noticia->user_id) || ($user->admin == 1));
+    }
+
+    /**
+     * Determine whether the user can delete the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function delete(User $user, Noticia $noticia)
+    {
+        return (($user->id === $noticia->user_id) || ($user->admin == 1));
+    }
+
+    /**
+     * Determine whether the user can restore the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function restore(User $user, Noticia $noticia)
+    {
+        //
+    }
+
+    /**
+     * Determine whether the user can permanently delete the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function forceDelete(User $user, Noticia $noticia)
+    {
+        //
+    }
+}
+
+===
+
+config/app.php
+/*
+|--------------------------------------------------------------------------
+| Autoloaded Service Providers
+|--------------------------------------------------------------------------
+|
+| The service providers listed here will be automatically loaded on the
+| request to your application. Feel free to add your own services to
+| this array to grant expanded functionality to your applications.
+|
+*/
+
+'providers' => [
+
+/*
+ * Laravel Framework Service Providers...
+ */
+Illuminate\Auth\AuthServiceProvider::class,
+Illuminate\Broadcasting\BroadcastServiceProvider::class,
+Illuminate\Bus\BusServiceProvider::class,
+Illuminate\Cache\CacheServiceProvider::class,
+Illuminate\Foundation\Providers\ConsoleSupportServiceProvider::class,
+Illuminate\Cookie\CookieServiceProvider::class,
+Illuminate\Database\DatabaseServiceProvider::class,
+Illuminate\Encryption\EncryptionServiceProvider::class,
+Illuminate\Filesystem\FilesystemServiceProvider::class,
+Illuminate\Foundation\Providers\FoundationServiceProvider::class,
+Illuminate\Hashing\HashServiceProvider::class,
+Illuminate\Mail\MailServiceProvider::class,
+Illuminate\Notifications\NotificationServiceProvider::class,
+Illuminate\Pagination\PaginationServiceProvider::class,
+Illuminate\Pipeline\PipelineServiceProvider::class,
+Illuminate\Queue\QueueServiceProvider::class,
+Illuminate\Redis\RedisServiceProvider::class,
+Illuminate\Auth\Passwords\PasswordResetServiceProvider::class,
+Illuminate\Session\SessionServiceProvider::class,
+Illuminate\Translation\TranslationServiceProvider::class,
+Illuminate\Validation\ValidationServiceProvider::class,
+Illuminate\View\ViewServiceProvider::class,
+
+/*
+ * Package Service Providers...
+ */
+Spatie\Permission\PermissionServiceProvider::class,
+
+/*
+ * Application Service Providers...
+ */
+App\Providers\AppServiceProvider::class,
+App\Providers\AuthServiceProvider::class,
+// App\Providers\BroadcastServiceProvider::class,
+App\Providers\EventServiceProvider::class,
+App\Providers\RouteServiceProvider::class,
+
+],
+
+==
+app/Models/User.php
+[ ... ]
+use Spatie\Permission\Traits\HasRoles;
+class User extends Authenticatable
+{
+    use HasApiTokens, HasFactory, Notifiable;
+    use HasRoles;
+
+[ ... ]
+
+
+app/Policies/NoticiaPolicy.php
+[ ... ]
+    /**
+     * Determine whether the user can view the model.
+     *
+     * @param  \App\Models\User  $user
+     * @param  \App\Models\Noticia  $noticia
+     * @return \Illuminate\Auth\Access\Response|bool
+     */
+    public function view(User $user, Noticia $noticia)
+    {
+        //return true;
+        return $user->id === $noticia->user_id || $user->hasPermissionTo('viewNoticia');
+        //return (($user->id === $noticia->user_id) || ($user->admin == 1));
+        
+    }
+[ ... ]
+
+php artisan tinker < spatie_script.php
+
+php artisan permission:cache-reset
+
+
+
+
+
+
+
+
+
+
+
+
